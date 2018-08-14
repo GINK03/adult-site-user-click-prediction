@@ -3,35 +3,62 @@ import json
 import MeCab
 from collections import Counter
 import re
-m = MeCab.Tagger('-Owakati')
-tar = tarfile.open('./parsed.tar.gz', 'r:gz')
+import click
+import pickle
+def make_sparse():
+  m = MeCab.Tagger('-Owakati')
+  tar = tarfile.open('./parsed.tar.gz', 'r:gz')
+  # tag, word embedding
+  tag_index = json.load(fp=open('tag_index.json'))
+  word_index = json.load(fp=open('word_index.json'))
+  data = []
+  for member in tar.getmembers():
+    #print(member)
+    if not member.isfile():
+      continue
+    fp = tar.extractfile(member)
+    datum = fp.read().decode()
 
-# tag, word embedding
-tag_index = json.load(fp=open('tag_index.json'))
-word_index = json.load(fp=open('word_index.json'))
+    obj = json.loads(datum)
 
-for member in tar.getmembers():
-  print(member)
-  if not member.isfile():
-    continue
-  fp = tar.extractfile(member)
-  datum = fp.read().decode()
+    text, hash, img_url, clk_num, target_url, tags = obj
+    words = m.parse(text).strip().split()
+    words = Counter(words)
+    i_freq = { word_index[word]:freq for word, freq in words.items() if word_index.get(word) }
+    t_hot  = { tag_index[tag]:1 for tag in tags if tag_index.get(tag) }
+    if re.search(r'\d{1,}', clk_num) is None:
+      continue
+    clk_num = int(re.search(r'\d{1,}', clk_num).group(0))
+    print(clk_num)
+    data.append( (clk_num, i_freq, t_hot) )
 
-  obj = json.loads(datum)
+  pickle.dump(data, open('data.pkl', 'wb'))
 
-  text, hash, img_url, clk_num, target_url, tags = obj
-  print(obj)
+import numpy as np
+def make_dense():
+  data = pickle.load(open('data.pkl', 'rb'))
 
-  words = m.parse(text).strip().split()
-  words = Counter(words)
+  clks = [x[0] for x in data] 
+  clks = np.array(clks)
+  height = len(clks)
+  w_freqs = np.zeros( (height, 3000) ).astype(np.float16)
+  t_hots = np.zeros( (height, 3000) ).astype(np.float16)
+  for h, x in enumerate(data):
+    ii = x[1]
+    tt = x[2]
+    for index, freq in ii.items():
+      w_freqs[h, index] = freq
+    for index, freq in tt.items():
+      t_hots[h, index]  = 1
+  
+  np.savez('dense.npz', clks=clks, t_hots=t_hots, w_freqs=w_freqs)
 
-  i_freq = { word_index[word]:freq for word, freq in words.items() }
-  t_hot  = { tag_index[tag]:1 for tag in tags }
-
-  if re.search(r'\d{1,}', clk_num) is None:
-    continue
-
-  clk_num = int(re.search(r'\d{1,}', clk_num).group(0))
-  print(clk_num)
-  print(i_freq)
-  print(t_hot)
+@click.command()
+@click.option('--mode', default='make_sparse', help='mode spec')
+def main(mode):
+  if mode == 'make_sparse':
+    make_sparse()
+  if mode == 'make_dense':
+    make_dense()
+if __name__ == '__main__':
+  main()
