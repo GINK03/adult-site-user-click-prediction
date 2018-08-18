@@ -32,3 +32,10 @@ $ python3 bow_embed.py --mode=make_sparse
 ```
 $ python3 bow_embed.py --mode=make_dense
 ```
+
+## DeepLearningで学習
+
+**5fold-cvで学習する**  
+```
+$ python3 keras_dense.py
+```
