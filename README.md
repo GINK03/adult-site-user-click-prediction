@@ -41,3 +41,7 @@ $ python3 bow_embed.py --mode=make_dense
 ```
 $ python3 keras_dense.py
 ```
+<div align="center">
+ <img widht="450px" src="https://user-images.githubusercontent.com/4949982/44300069-e67ab700-a33b-11e8-8d82-0777be0af924.png">
+</div>
+
